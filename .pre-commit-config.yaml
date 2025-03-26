@@ -1,0 +1,16 @@
+repos:
+  - repo: local
+    hooks:
+      - id: black
+        name: Format with Black
+        entry: black
+        language: python
+        types: [python]
+
+      - id: ruff
+        name: Check with Ruff
+        entry: ruff
+        language: python
+        pass_filenames: false
+        always_run: true
+        args: ["check", "src", "tests", "--fix"]

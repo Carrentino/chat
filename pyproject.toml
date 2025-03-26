@@ -1,0 +1,203 @@
+[tool.poetry]
+name = "base"
+package-mode = false
+version = "0.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.dependencies]
+python = "~3.12"
+alembic = { extras = ["tz"], version = "^1.13.0" }
+asyncpg = "^0.29.0"
+helpers = { git = "git@github.com:Carrentino/helpers.git", branch = 'main' }
+fastapi = { extras = ["all"], version = "^0.115.8" }
+gunicorn = "^23.0.0"
+loguru = "^0.7.0"
+orjson = "^3.10.7"
+pillow = "^10.4.0"
+prometheus-fastapi-instrumentator = "^7.0.0"
+pydantic = { extras = ["all"], version = "^2.6.2" }
+pydantic-settings = "^2.4.0"
+sqladmin = "^0.18.0"
+sqlalchemy = { extras = ["asyncio", "mypy"], version = "^2.0.0" }
+pytest-env = "^1.1.4"
+fastapi-storages = "^0.3.0"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.3.0"
+mypy = "^1.10.0"
+pre-commit = "^3.6.0"
+poetry-pre-commit-plugin = "^0.1.2"
+psycopg = { extras = ["binary"], version = "^3.1.19" }
+pytest = "^8.2.0"
+pytest-asyncio = "^0.23.7"
+pytest-clarity = "^1.0.1"
+pytest-docker = "^3.1.1"
+pytest-freezegun = "^0.4.2"
+pytest-postgresql = "^6.0.0"
+pytest-sugar = "^1.0.0"
+respx = "^0.21.0"
+ruff = "^0.4.0"
+types-redis = "^4.6.0.20240425"
+types-python-dateutil = "^2.9.0.20241003"
+
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+pythonpath = "src"
+testpaths = "tests"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning"
+]
+addopts = "-vv -ss --tb=short" #  --alluredir allure-results
+asyncio_mode = "auto"
+env = [
+    "AUTH_ENVIRONMENT=pytest",
+    "AUTH_DB_BASE=src_test",
+]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+allow_subclassing_any = true
+allow_untyped_calls = true
+pretty = true
+show_error_codes = true
+implicit_reexport = true
+allow_untyped_decorators = true
+warn_unused_ignores = false
+warn_return_any = false
+namespace_packages = true
+exclude = ["env", "venv"]
+plugins = [
+    "pydantic.mypy",
+    "sqlalchemy.ext.mypy.plugin",
+]
+
+[tool.black]
+line-length = 120
+skip-magic-trailing-comma = false
+skip-string-normalization = true
+target-version = ['py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.mypy_cache
+  | \.pytest_cache
+  | \.venv
+  | \.vscode
+  | \.idea
+)
+'''
+
+[tool.ruff]
+# List of enabled rule sets.
+# See https://docs.astral.sh/ruff/rules/ for more information.
+target-version = 'py312'
+line-length = 120
+src = ["src", "tests"]
+
+lint.select = [
+    "F", # Pyflakes
+    "E", # pycodestyle
+    "C90", # mccabe
+    "I", # isort
+    "N", # pep8-naming
+    #    "D", # pydocstyle
+    "UP", # pyupgrade
+    "YTT", # flake8-2020
+    #    "ANN", # flake8-annotations
+    "S", # flake8-bandit
+    # "BLE",  # flake8-blind-except
+    "FBT", # flake8-boolean-trap
+    "B", # flake8-bugbear
+    #   "A",  # flake8-builtins
+    "COM", # flake8-commas
+    "C4", # flake8-comprehensions
+    # "DTZ",  # flake8-datetimez
+    "T10", # flake8-debugger
+    "EXE", # flake8-executable
+    "ISC", # flake8-implicit-str-concat
+    "ICN", # flake8-import-conventions
+    "G", # flake8-logging-format
+    "INP", # flake8-no-pep420
+    "T20", # flake8-print
+    "PT", # flake8-pytest-style
+    #    "Q", # flake8-quotes
+    "RET", # flake8-return
+    "SIM", # flake8-simplify
+    "TID", # flake8-tidy-imports
+    "TCH", # flake8-type-checking
+    "ARG", # flake8-unused-arguments
+    "PTH", # flake8-use-pathlib
+    "ERA", # eradicate
+    "PL", # Pylint
+    "TRY", # tryceratops
+    "RSE", # flake8-raise
+    "SLF", # flake8-self
+    "RUF", # Ruff-specific rules
+    "ASYNC", # flake8-async
+]
+
+lint.ignore = [
+    "ERA001",
+    "S101",
+    "SLF00",
+    "ISC001",
+    "RET504",
+    "S105",
+    "S106",
+    "RUF001",
+    "RUF003",
+    "PLR0913",
+    "TRY003",
+    "S311",
+    'COM819',
+    'B024',
+    'B008',
+    'COM812',
+    'I001',
+    'RUF100',
+]
+
+exclude = [
+    "src/db/migrations",
+    ".venv/"
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.params.Depends",
+    "fastapi.Query",
+    "fastapi.params.Query",
+]
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "sqlalchemy.orm.DeclarativeBase"]
+runtime-evaluated-decorators = ["pydantic.validate_call", "attrs.define", "sqlalchemy.orm.declared_attr"]
+
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+ignore-decorators = ["typing.overload"]
+
+[tool.ruff.lint.pylint]
+allow-magic-value-types = ["int", "str", "float", "bytes"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
