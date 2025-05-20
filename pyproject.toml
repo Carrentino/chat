@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "base"
+name = "chat"
 package-mode = false
 version = "0.1.0"
 
@@ -11,7 +11,7 @@ build-backend = "poetry.core.masonry.api"
 python = "~3.12"
 alembic = { extras = ["tz"], version = "^1.13.0" }
 asyncpg = "^0.29.0"
-helpers = { git = "git@github.com:Carrentino/helpers.git", branch = 'main' }
+helpers = {git = "https://github.com/Carrentino/helpers.git", rev = "main"}
 fastapi = { extras = ["all"], version = "^0.115.8" }
 gunicorn = "^23.0.0"
 loguru = "^0.7.0"
@@ -24,6 +24,7 @@ sqladmin = "^0.18.0"
 sqlalchemy = { extras = ["asyncio", "mypy"], version = "^2.0.0" }
 pytest-env = "^1.1.4"
 fastapi-storages = "^0.3.0"
+aioredis = "^2.0.1"
 
 
 [tool.poetry.group.dev.dependencies]

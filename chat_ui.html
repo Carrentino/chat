@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chat Test UI</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Babel для JSX в браузере -->
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-100">
+  <div id="root" class="h-screen"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    function ChatApp({ apiBase, wsBase, token, userId }) {
+      const [rooms, setRooms] = useState([]);
+      const [activeRoom, setActiveRoom] = useState(null);
+      const [messages, setMessages] = useState([]);
+      const [hasMore, setHasMore] = useState(true);
+      const [offset, setOffset] = useState(0);
+      const [text, setText] = useState('');
+      const [file, setFile] = useState(null);
+
+      const wsRef = useRef(null);
+      const bottomRef = useRef(null);
+
+      // Загрузка списка комнат
+      useEffect(() => {
+        fetch(`${apiBase}/rooms/`, {
+          headers: { "X-Auth-Token": `${token}` }
+        })
+          .then(res => res.json())
+          .then(data => setRooms(data))
+          .catch(console.error);
+      }, []);
+
+      // Выбор комнаты и сброс состояния
+      const selectRoom = useCallback(room => {
+        if (wsRef.current) wsRef.current.close();
+        setActiveRoom(room);
+        setMessages([]);
+        setOffset(0);
+        setHasMore(true);
+      }, []);
+
+      // Установка WebSocket для активной комнаты
+      useEffect(() => {
+        if (!activeRoom) return;
+        const ws = new WebSocket(`${wsBase}/ws/chat/${activeRoom.id}?token=${encodeURIComponent(token)}`);
+        // ws.onopen = () => {
+        //   ws.send(JSON.stringify({ type: 'auth', data: { token } }));
+        // };
+        ws.onmessage = e => {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'message' || msg.type === 'status') {
+            setMessages(prev => [...prev, msg.data]);
+            scrollToBottom();
+          }
+        };
+        ws.onerror = e => console.error('WebSocket error', e);
+        wsRef.current = ws;
+        return () => ws.close();
+      }, [activeRoom]);
+
+      // Загрузка истории (offset-based)
+      const loadHistory = useCallback(() => {
+        if (!activeRoom || !hasMore) return;
+        fetch(`${apiBase}/rooms/${activeRoom.id}/messages/?offset=${offset}&limit=50`, {
+          headers: { "X-Auth-Token": `${token}` }
+        })
+          .then(res => res.json())
+          .then(batch => {
+            setMessages(prev => [...batch.reverse(), ...prev]);
+            setOffset(prev => prev + batch.length);
+            if (batch.length < 50) setHasMore(false);
+          })
+          .catch(console.error);
+      }, [activeRoom, offset, hasMore]);
+
+      // Infinite scroll: загрузка при достижении верха списка
+      useEffect(() => {
+        const container = document.getElementById('messages');
+        if (!container) return;
+        const firstMsg = container.firstChild;
+        if (!firstMsg || !hasMore) return;
+        const observer = new IntersectionObserver(entries => {
+          if (entries[0].isIntersecting) {
+            loadHistory();
+          }
+        }, { root: container, threshold: 0.1 });
+        observer.observe(firstMsg);
+        return () => observer.disconnect();
+      }, [messages]);
+
+      const scrollToBottom = () => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      };
+
+      // Отправка текстового сообщения
+      const sendMessage = () => {
+        if (!text.trim()) return;
+        wsRef.current.send(JSON.stringify({ type: 'message', data: { content: text } }));
+        setText('');
+      };
+
+      // Отправка вложения
+      const sendAttachment = () => {
+        if (!file) return;
+        const form = new FormData();
+        form.append('file', file);
+        form.append('file_type', file.type);
+        fetch(`${apiBase}/rooms/${activeRoom.id}/attachments`, {
+          method: 'POST',
+          headers: { "X-Auth-Token": `${token}` },
+          body: form
+        })
+        .then(() => setFile(null))
+        .catch(console.error);
+      };
+
+      return (
+        <div className="flex h-screen">
+          {/* Список комнат */}
+          <aside className="w-1/4 border-r p-4 overflow-y-auto bg-white">
+            <h2 className="text-xl mb-4">Мои чаты</h2>
+            {rooms.map(room => (
+              <div
+                key={room.id}
+                className={`p-2 mb-2 rounded cursor-pointer ${activeRoom?.id === room.id ? 'bg-blue-200' : 'hover:bg-gray-100'}`}
+                onClick={() => selectRoom(room)}
+              >
+                Заказ: {room.order_id.slice(0,8)}…
+              </div>
+            ))}
+          </aside>
+
+          {/* Окно чата */}
+          <div className="flex-1 flex flex-col bg-gray-50">
+            {activeRoom ? (
+              <>
+                <div id="messages" className="flex-1 p-4 overflow-y-auto">
+                  {messages.map(m => (
+                    <div key={m.id} className={`msg my-1 max-w-md break-words p-2 rounded ${m.sender_id === userId ? 'self-end bg-blue-100' : 'self-start bg-gray-100'}`}>
+                      <div>{m.content}</div>
+                      {m.attachments && m.attachments.map(att => (
+                        <div key={att.id} className="mt-1">
+                          <a href={att.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{att.file_type}</a>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  <div ref={bottomRef}></div>
+                </div>
+
+                <div className="p-4 border-t flex items-center bg-white">
+                  <input
+                    type="file"
+                    className="mr-2"
+                    onChange={e => setFile(e.target.files[0])}
+                  />
+                  <button onClick={sendAttachment} disabled={!file} className="mr-4 px-4 py-2 bg-green-500 text-white rounded disabled:opacity-50">📎</button>
+                  <input
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                    placeholder="Напишите сообщение…"
+                    className="flex-1 border rounded px-2 py-1 mr-2"
+                  />
+                  <button onClick={sendMessage} className="px-4 py-2 bg-blue-500 text-white rounded">Отправить</button>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-gray-500">Выберите чат слева</div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Рендер приложения: замените плейсхолдеры
+    ReactDOM.render(
+      <ChatApp
+        apiBase="http://localhost:8080/api/chat"
+        wsBase="ws://localhost:8080/api/chat"
+        token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZTkzYTYzZjktMjVmYi00YzBmLTlhZDAtODc2MTM3YjY0OWIxIiwic3RhdHVzIjoiXHUwNDFkXHUwNDM1IFx1MDQzMlx1MDQzNVx1MDQ0MFx1MDQzOFx1MDQ0NFx1MDQzOFx1MDQ0Nlx1MDQzOFx1MDQ0MFx1MDQzZVx1MDQzMlx1MDQzMFx1MDQzZCIsInR5cGUiOiJBQ0NFU1MiLCJleHAiOjE3NDgxMTEzOTZ9.Nl1Yop7pXmE-xuTUIBnHTTD7nBZ6yAguFfj8YYw5jBY"
+        userId="e93a63f9-25fb-4c0f-9ad0-876137b649b1"
+      />,
+      document.getElementById('root')
+    );
+  </script>
+</body>
+</html>
